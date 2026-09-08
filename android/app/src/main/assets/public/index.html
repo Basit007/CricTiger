@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>CricTiger - Pro Scoring</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              tiger: {
+                black: '#0f172a', // Dark Slate
+                gold: '#fbbf24', // Amber 400
+                orange: '#d97706', // Amber 600
+                darkOrange: '#78350f',
+                card: '#1e293b',
+              }
+            },
+            fontFamily: {
+              sans: ['ui-sans-serif', 'system-ui', 'sans-serif'],
+              mono: ['ui-monospace', 'SFMono-Regular', 'monospace'],
+            }
+          }
+        }
+      }
+    </script>
+    <style>
+      /* Hide scrollbar for clean UI in timeline */
+      .no-scrollbar::-webkit-scrollbar {
+        display: none;
+      }
+      .no-scrollbar {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+      }
+
+      /* PDF / PRINT OPTIMIZATION */
+      @media print {
+        body {
+          background: white !important;
+          color: black !important;
+          overflow: visible !important;
+        }
+        .no-print, button, .bg-tiger-black, .bg-gray-800, .bg-gray-900 {
+          background: white !important;
+          color: black !important;
+          box-shadow: none !important;
+          border-color: #eee !important;
+          display: none !important;
+        }
+        .print-only {
+          display: block !important;
+        }
+        .print-container {
+          background: white !important;
+          color: black !important;
+          width: 100% !important;
+          position: relative !important;
+          display: block !important;
+        }
+        .print-table-header {
+          background: #f3f4f6 !important;
+          color: #374151 !important;
+          border-bottom: 2px solid #374151 !important;
+        }
+        .text-tiger-gold, .text-blue-400, .text-white {
+          color: black !important;
+        }
+        .bg-tiger-card {
+           background: #f9fafb !important;
+           border-bottom: 1px solid #ddd !important;
+        }
+        #root {
+          height: auto !important;
+          overflow: visible !important;
+        }
+      }
+      .print-only { display: none; }
+    </style>
+
+<link rel="stylesheet" href="/index.css">
+  <script type="importmap">
+{
+  "imports": {
+    "react-dom/": "https://esm.sh/react-dom@^19.2.1/",
+    "@google/genai": "https://esm.sh/@google/genai@^1.33.0",
+    "react/": "https://esm.sh/react@^19.2.1/",
+    "react": "https://esm.sh/react@^19.2.1",
+    "recharts": "https://esm.sh/recharts@^3.5.1",
+    "lucide-react": "https://esm.sh/lucide-react@^0.560.0"
+  }
+}
+</script>
+  <script type="module" crossorigin src="/assets/index-BueH1BtC.js"></script>
+</head>
+  <body class="bg-tiger-black text-white overflow-hidden selection:bg-tiger-gold selection:text-black">
+    <div id="root"></div>
+</body>
+</html>

@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>CricTiger - Pro Scoring</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M50 95C50 95 15 80 15 25L50 10L85 25C85 80 50 95 50 95Z' fill='%23fbbf24'/%3E%3Cpath d='M35 35L42 65M50 30L50 70M65 35L58 65' stroke='%230f172a' stroke-width='6' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='78' r='8' fill='%23ef4444'/%3E%3C/svg%3E">
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#fbbf24">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="CricTiger">
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js').then(registration => {
+            console.log('SW registered: ', registration);
+          }).catch(registrationError => {
+            console.log('SW registration failed: ', registrationError);
+          });
+        });
+      }
+    </script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              tiger: {
+                black: '#0f172a', // Dark Slate
+                gold: '#fbbf24', // Amber 400
+                orange: '#d97706', // Amber 600
+                darkOrange: '#78350f',
+                card: '#1e293b',
+              }
+            },
+            fontFamily: {
+              sans: ['ui-sans-serif', 'system-ui', 'sans-serif'],
+              mono: ['ui-monospace', 'SFMono-Regular', 'monospace'],
+            }
+          }
+        }
+      }
+    </script>
+    <style>
+      /* Hide scrollbar for clean UI in timeline */
+      .no-scrollbar::-webkit-scrollbar {
+        display: none;
+      }
+      .no-scrollbar {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+      }
+
+      /* PDF / PRINT OPTIMIZATION */
+      @media print {
+        body {
+          background: white !important;
+          color: black !important;
+          overflow: visible !important;
+        }
+        .no-print, button, .bg-tiger-black, .bg-gray-800, .bg-gray-900 {
+          background: white !important;
+          color: black !important;
+          box-shadow: none !important;
+          border-color: #eee !important;
+          display: none !important;
+        }
+        .print-only {
+          display: block !important;
+        }
+        .print-container {
+          background: white !important;
+          color: black !important;
+          width: 100% !important;
+          position: relative !important;
+          display: block !important;
+        }
+        .print-table-header {
+          background: #f3f4f6 !important;
+          color: #374151 !important;
+          border-bottom: 2px solid #374151 !important;
+        }
+        .text-tiger-gold, .text-blue-400, .text-white {
+          color: black !important;
+        }
+        .bg-tiger-card {
+           background: #f9fafb !important;
+           border-bottom: 1px solid #ddd !important;
+        }
+        #root {
+          height: auto !important;
+          overflow: visible !important;
+        }
+      }
+      .print-only { display: none; }
+    </style>
+  </head>
+  <body class="bg-tiger-black text-white min-h-screen selection:bg-tiger-gold selection:text-black">
+    <div id="root"></div>
+  <script type="module" src="/index.tsx"></script>
+</body>
+</html>

@@ -1,0 +1,6 @@
+{
+  "name": "CricTiger",
+  "description": "Professional ICC-standard cricket scoring engine with AI-powered commentary and insights.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
