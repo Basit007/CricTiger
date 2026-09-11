@@ -69,6 +69,60 @@ const hashPassword = (pw: string): string => {
   return 'ct_' + Math.abs(hash).toString(16) + '_' + pw.length;
 };
 
+// Auto-sync local accounts and data with server
+export const initServerSync = async (): Promise<void> => {
+  try {
+    const localAccounts = getTeamAccounts();
+    const res = await fetch('/api/accounts/sync-local', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ accounts: localAccounts }),
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      if (data.accounts && Array.isArray(data.accounts)) {
+        saveTeamAccounts(data.accounts);
+      }
+    }
+
+    const activeId = getActiveAccountId();
+    if (activeId) {
+      const dataRes = await fetch(`/api/accounts/${activeId}/data`);
+      if (dataRes.ok) {
+        const teamData = await dataRes.json();
+        if (teamData.data) {
+          if (Array.isArray(teamData.data.matches) && teamData.data.matches.length > 0) {
+            localStorage.setItem(getScopedKey('matches', activeId), JSON.stringify(teamData.data.matches));
+          }
+          if (Array.isArray(teamData.data.teams) && teamData.data.teams.length > 0) {
+            localStorage.setItem(getScopedKey('teams', activeId), JSON.stringify(teamData.data.teams));
+          }
+        }
+      }
+    }
+
+    // Also pull latest developer DB config from server if available
+    const devRes = await fetch('/api/dev/config');
+    if (devRes.ok) {
+      const devData = await devRes.json();
+      if (devData.config && devData.config.sheetWebhookUrl) {
+        const localDev = getDeveloperDbConfig();
+        if (!localDev.sheetWebhookUrl) {
+          saveDeveloperDbConfig({ ...localDev, ...devData.config });
+        }
+      }
+    }
+  } catch (err) {
+    // Offline or server warming up
+  }
+};
+
+// Run initial sync on module load
+if (typeof window !== 'undefined') {
+  initServerSync();
+}
+
 export interface RegisterTeamParams {
   teamName: string;
   username: string;
@@ -79,10 +133,9 @@ export interface RegisterTeamParams {
   initialSquad?: string[];
 }
 
-export const registerTeamAccount = (
+export const registerTeamAccount = async (
   params: RegisterTeamParams
-): { success: boolean; error?: string; account?: TeamAccount } => {
-  const accounts = getTeamAccounts();
+): Promise<{ success: boolean; error?: string; account?: TeamAccount }> => {
   const trimmedUser = params.username.trim().toLowerCase();
   const trimmedTeam = params.teamName.trim();
 
@@ -96,7 +149,39 @@ export const registerTeamAccount = (
     return { success: false, error: 'Password must be at least 4 characters.' };
   }
 
-  // Check unique username
+  // 1. Try server registration first (ensures cross-device availability)
+  try {
+    const response = await fetch('/api/accounts/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params),
+    });
+    const data = await response.json();
+    if (response.ok && data.success && data.account) {
+      const accounts = getTeamAccounts();
+      const existingIdx = accounts.findIndex(a => a.id === data.account.id || a.username.toLowerCase() === trimmedUser);
+      if (existingIdx >= 0) {
+        accounts[existingIdx] = data.account;
+      } else {
+        accounts.push(data.account);
+      }
+      saveTeamAccounts(accounts);
+      setActiveAccountId(data.account.id);
+
+      if (data.teams && Array.isArray(data.teams)) {
+        localStorage.setItem(getScopedKey('teams', data.account.id), JSON.stringify(data.teams));
+      }
+
+      return { success: true, account: data.account };
+    } else if (data && !data.success) {
+      return { success: false, error: data.error || 'Registration failed.' };
+    }
+  } catch (netErr) {
+    console.warn('Server offline during registration, saving to local device', netErr);
+  }
+
+  // 2. Offline fallback
+  const accounts = getTeamAccounts();
   const existing = accounts.find(a => a.username.toLowerCase() === trimmedUser);
   if (existing) {
     return { success: false, error: 'A team with this username already exists. Please choose another username.' };
@@ -118,7 +203,6 @@ export const registerTeamAccount = (
   saveTeamAccounts(accounts);
   setActiveAccountId(accountId);
 
-  // Initialize the team's primary club squad in their isolated storage
   const primaryTeam: SavedTeam = {
     id: `team_${accountId}_primary`,
     name: trimmedTeam,
@@ -133,16 +217,53 @@ export const registerTeamAccount = (
   return { success: true, account: newAccount };
 };
 
-export const loginTeamAccount = (
+export const loginTeamAccount = async (
   username: string,
   password: string
-): { success: boolean; error?: string; account?: TeamAccount } => {
-  const accounts = getTeamAccounts();
+): Promise<{ success: boolean; error?: string; account?: TeamAccount }> => {
   const trimmedUser = username.trim().toLowerCase();
 
+  // 1. Try server login first (ensures cross-device login works seamlessly)
+  try {
+    const response = await fetch('/api/accounts/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: trimmedUser, password }),
+    });
+    const data = await response.json();
+
+    if (response.ok && data.success && data.account) {
+      const accounts = getTeamAccounts();
+      const existingIdx = accounts.findIndex(a => a.id === data.account.id || a.username.toLowerCase() === trimmedUser);
+      if (existingIdx >= 0) {
+        accounts[existingIdx] = data.account;
+      } else {
+        accounts.push(data.account);
+      }
+      saveTeamAccounts(accounts);
+      setActiveAccountId(data.account.id);
+
+      // Cache downloaded matches and squads
+      if (data.matches && Array.isArray(data.matches)) {
+        localStorage.setItem(getScopedKey('matches', data.account.id), JSON.stringify(data.matches));
+      }
+      if (data.teams && Array.isArray(data.teams)) {
+        localStorage.setItem(getScopedKey('teams', data.account.id), JSON.stringify(data.teams));
+      }
+
+      return { success: true, account: data.account };
+    } else if (response.status === 401 || response.status === 400 || (data && !data.success)) {
+      return { success: false, error: data.error || 'Login failed.' };
+    }
+  } catch (netErr) {
+    console.warn('Server offline during login, checking local storage', netErr);
+  }
+
+  // 2. Offline fallback
+  const accounts = getTeamAccounts();
   const account = accounts.find(a => a.username.toLowerCase() === trimmedUser);
   if (!account) {
-    return { success: false, error: 'Account not found with this username.' };
+    return { success: false, error: 'Account not found with this username. Check spelling or connect to internet.' };
   }
 
   if (account.passwordHash !== hashPassword(password)) {
@@ -155,6 +276,64 @@ export const loginTeamAccount = (
 
 export const logoutTeamAccount = () => {
   setActiveAccountId(null);
+};
+
+export const resetTeamPasswordWithPin = async (
+  username: string,
+  adminPin: string,
+  newPassword: string
+): Promise<{ success: boolean; error?: string }> => {
+  const trimmedUser = username.trim().toLowerCase();
+  if (!trimmedUser) {
+    return { success: false, error: 'Please enter your team username.' };
+  }
+
+  // 1. Try server reset
+  try {
+    const response = await fetch('/api/accounts/reset-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: trimmedUser, adminPin, newPassword }),
+    });
+    const data = await response.json();
+    if (response.ok && data.success) {
+      const accounts = getTeamAccounts();
+      const accountIndex = accounts.findIndex(a => a.username.toLowerCase() === trimmedUser);
+      if (accountIndex >= 0) {
+        accounts[accountIndex].passwordHash = hashPassword(newPassword);
+        saveTeamAccounts(accounts);
+      }
+      return { success: true };
+    } else if (data && !data.success) {
+      return { success: false, error: data.error || 'Password reset failed.' };
+    }
+  } catch (err) {
+    console.warn('Server offline during reset, falling back to local verification', err);
+  }
+
+  // 2. Offline fallback
+  const devConfig = getDeveloperDbConfig();
+  const validPin = devConfig.adminPin || '1234';
+
+  if (!adminPin || adminPin.trim() !== validPin) {
+    return { success: false, error: 'Incorrect Developer / Admin PIN. (Default is 1234 unless customized).' };
+  }
+
+  if (!newPassword || newPassword.length < 4) {
+    return { success: false, error: 'New password must be at least 4 characters long.' };
+  }
+
+  const accounts = getTeamAccounts();
+  const accountIndex = accounts.findIndex(a => a.username.toLowerCase() === trimmedUser);
+
+  if (accountIndex === -1) {
+    return { success: false, error: `No registered team found with username "${username}".` };
+  }
+
+  accounts[accountIndex].passwordHash = hashPassword(newPassword);
+  saveTeamAccounts(accounts);
+
+  return { success: true };
 };
 
 // --- TEAM-ISOLATED DATA ACCESSORS ---
@@ -185,12 +364,30 @@ export const saveTeam = (team: SavedTeam, accountId?: string) => {
     teams.push(team);
   }
   localStorage.setItem(key, JSON.stringify(teams));
+
+  const id = accountId || getActiveAccountId();
+  if (id) {
+    fetch(`/api/accounts/${id}/data`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ teams }),
+    }).catch(err => console.warn('Background sync teams failed:', err));
+  }
 };
 
 export const deleteTeam = (teamId: string, accountId?: string) => {
   const key = getScopedKey('teams', accountId);
   const teams = getSavedTeams(accountId).filter(t => t.id !== teamId);
   localStorage.setItem(key, JSON.stringify(teams));
+
+  const id = accountId || getActiveAccountId();
+  if (id) {
+    fetch(`/api/accounts/${id}/data`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ teams }),
+    }).catch(err => console.warn('Background sync teams failed:', err));
+  }
 };
 
 // --- TEAM-ISOLATED MATCH HISTORY ---
@@ -211,6 +408,15 @@ export const saveMatch = (match: MatchState, accountId?: string) => {
   const matches = getSavedMatches(accountId);
   matches.push(match);
   localStorage.setItem(key, JSON.stringify(matches));
+
+  const id = accountId || getActiveAccountId();
+  if (id) {
+    fetch(`/api/accounts/${id}/data`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ matches }),
+    }).catch(err => console.warn('Background sync matches failed:', err));
+  }
 };
 
 export const clearMatches = (accountId?: string) => {
@@ -242,4 +448,41 @@ export const saveDraftMatch = (
 export const clearDraftMatch = (accountId?: string) => {
   const key = getScopedKey('draft', accountId);
   localStorage.removeItem(key);
+};
+
+// --- DEVELOPER DATABASE (GOOGLE SHEETS) CONFIGURATION ---
+
+export interface DeveloperDbConfig {
+  sheetWebhookUrl: string;
+  autoSyncOnMatchEnd: boolean;
+  adminPin: string;
+  lastSyncTimestamp?: number;
+  lastSyncStatus?: 'SUCCESS' | 'FAILED' | 'IDLE';
+}
+
+const DEV_DB_CONFIG_KEY = 'crictiger_developer_db_config_v2';
+
+export const getDeveloperDbConfig = (): DeveloperDbConfig => {
+  try {
+    const raw = localStorage.getItem(DEV_DB_CONFIG_KEY);
+    if (raw) {
+      return JSON.parse(raw);
+    }
+  } catch (err) {
+    console.error('Failed to get developer db config', err);
+  }
+  return {
+    sheetWebhookUrl: '',
+    autoSyncOnMatchEnd: true,
+    adminPin: '1234',
+    lastSyncStatus: 'IDLE'
+  };
+};
+
+export const saveDeveloperDbConfig = (config: DeveloperDbConfig) => {
+  try {
+    localStorage.setItem(DEV_DB_CONFIG_KEY, JSON.stringify(config));
+  } catch (err) {
+    console.error('Failed to save developer db config', err);
+  }
 };

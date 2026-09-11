@@ -21,9 +21,19 @@ export const MatchSummary: React.FC<Props> = ({ matchState, onSaveAndExit }) => 
 
   // --- RESULT LOGIC ---
   const result = useMemo(() => {
-    const { inningsNumber, totalRuns, wickets, target, firstInningsScore, battingTeam, bowlingTeam } = matchState;
+    const { inningsNumber, totalRuns, wickets, target, firstInningsScore, battingTeam, bowlingTeam, customResult, declarationNote } = matchState;
 
-    if (inningsNumber === 1) {
+    if (customResult) {
+      return {
+        winner: customResult,
+        margin: '',
+        winnerTeam: customResult,
+        isTie: false,
+        color: 'text-amber-400'
+      };
+    }
+
+    if (inningsNumber === 1 && !declarationNote) {
        return {
          winner: 'Innings Break',
          margin: 'First Innings Completed',

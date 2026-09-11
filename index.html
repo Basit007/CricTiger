@@ -3,13 +3,34 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>CricTiger - Pro Scoring</title>
+    <title>CricTiger</title>
+    <meta name="description" content="Professional ICC-standard cricket scoring engine with AI-powered commentary and insights." />
+    <meta property="og:title" content="CricTiger" />
+    <meta property="og:description" content="Professional ICC-standard cricket scoring engine with AI-powered commentary and insights." />
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M50 95C50 95 15 80 15 25L50 10L85 25C85 80 50 95 50 95Z' fill='%23fbbf24'/%3E%3Cpath d='M35 35L42 65M50 30L50 70M65 35L58 65' stroke='%230f172a' stroke-width='6' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='78' r='8' fill='%23ef4444'/%3E%3C/svg%3E">
     <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#fbbf24">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="CricTiger">
+    <script>
+      (function() {
+        try {
+          if (typeof window !== 'undefined' && window.fetch) {
+            var _nativeFetch = window.fetch.bind(window);
+            var _currentFetch = _nativeFetch;
+            Object.defineProperty(window, 'fetch', {
+              get: function() { return _currentFetch; },
+              set: function(fn) { _currentFetch = fn; },
+              configurable: true,
+              enumerable: true
+            });
+          }
+        } catch (e) {
+          // fetch is already writable or environment restricted
+        }
+      })();
+    </script>
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {

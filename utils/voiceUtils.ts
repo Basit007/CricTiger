@@ -1,53 +1,79 @@
 
-export function speak(text: string, rate: number = 0.9, pitch: number = 1.0) {
-  if (!('speechSynthesis' in window)) {
-    console.error('Speech synthesis not supported');
-    return;
+let sharedAudioContext: AudioContext | null = null;
+
+function getAudioContext(): AudioContext | null {
+  try {
+    if (!sharedAudioContext || sharedAudioContext.state === 'closed') {
+      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      if (AudioContextClass) {
+        sharedAudioContext = new AudioContextClass();
+      }
+    }
+    if (sharedAudioContext && sharedAudioContext.state === 'suspended') {
+      sharedAudioContext.resume().catch(() => {});
+    }
+    return sharedAudioContext;
+  } catch (e) {
+    return null;
   }
+}
 
-  // Cancel any ongoing speech
-  window.speechSynthesis.cancel();
+export function speak(text: string, rate: number = 0.95, pitch: number = 1.0) {
+  try {
+    if (!('speechSynthesis' in window)) return;
 
-  const utterance = new SpeechSynthesisUtterance(text);
-  
-  // Try to find a good English voice
-  const voices = window.speechSynthesis.getVoices();
-  const preferredVoice = voices.find(v => 
-    v.name.includes('Google UK English Male') || 
-    v.name.includes('Male') || 
-    v.lang.startsWith('en-GB')
-  ) || voices.find(v => v.lang.startsWith('en'));
+    window.speechSynthesis.cancel();
 
-  if (preferredVoice) {
-    utterance.voice = preferredVoice;
+    const utterance = new SpeechSynthesisUtterance(text);
+    const voices = window.speechSynthesis.getVoices();
+    const preferredVoice = voices.find(v => 
+      v.name.includes('Google UK English Male') || 
+      v.name.includes('Male') || 
+      v.lang.startsWith('en-GB')
+    ) || voices.find(v => v.lang.startsWith('en'));
+
+    if (preferredVoice) utterance.voice = preferredVoice;
+
+    utterance.rate = rate;
+    utterance.pitch = pitch;
+    utterance.volume = 1;
+
+    // Protection against speech synthesis queue hanging on mobile Chrome/Safari
+    const timeout = setTimeout(() => {
+      window.speechSynthesis.cancel();
+    }, 6000);
+
+    utterance.onend = () => clearTimeout(timeout);
+    utterance.onerror = () => clearTimeout(timeout);
+
+    window.speechSynthesis.speak(utterance);
+  } catch (err) {
+    console.warn("Speech synthesis unavailable:", err);
   }
-
-  utterance.rate = rate;
-  utterance.pitch = pitch;
-  utterance.volume = 1;
-
-  window.speechSynthesis.speak(utterance);
 }
 
 /**
- * Plays raw PCM audio from a base64 string.
- * Gemini TTS returns raw PCM (linear16) at 24000Hz.
+ * Plays raw PCM audio from a base64 string safely.
  */
 export async function playBase64Audio(base64Data: string, sampleRate: number = 24000) {
-  const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-  
   try {
+    const audioContext = getAudioContext();
+    if (!audioContext) return;
+
+    if (audioContext.state === 'suspended') {
+      await audioContext.resume().catch(() => {});
+    }
+
     const binaryString = atob(base64Data);
     const bytes = new Uint8Array(binaryString.length);
     for (let i = 0; i < binaryString.length; i++) {
-        bytes[i] = binaryString.charCodeAt(i);
+      bytes[i] = binaryString.charCodeAt(i);
     }
 
-    // Convert Int16Array to Float32Array (normalized -1.0 to 1.0)
     const int16Buffer = new Int16Array(bytes.buffer);
     const float32Buffer = new Float32Array(int16Buffer.length);
     for (let i = 0; i < int16Buffer.length; i++) {
-        float32Buffer[i] = int16Buffer[i] / 32768.0;
+      float32Buffer[i] = int16Buffer[i] / 32768.0;
     }
 
     const audioBuffer = audioContext.createBuffer(1, float32Buffer.length, sampleRate);
@@ -56,15 +82,8 @@ export async function playBase64Audio(base64Data: string, sampleRate: number = 2
     const source = audioContext.createBufferSource();
     source.buffer = audioBuffer;
     source.connect(audioContext.destination);
-    
     source.start();
-    
-    // Cleanup context when finished
-    source.onended = () => {
-      audioContext.close();
-    };
   } catch (error) {
-    console.error("Error playing audio:", error);
-    audioContext.close();
+    console.warn("Audio playback skipped:", error);
   }
 }

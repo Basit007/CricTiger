@@ -1,14 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { Trophy, BarChart2, Users, Settings, LogOut, PlusCircle, Shield } from 'lucide-react';
+import { Trophy, BarChart2, Users, Settings, LogOut, PlusCircle, Shield, Zap, Target, Database, KeyRound } from 'lucide-react';
 import { getSavedTeams } from '../utils/storage';
 import { SavedTeam, TeamAccount } from '../types';
 import { AppLogo } from './AppLogo';
+import { AccountModal } from './AccountModal';
+import { getMaxBowlerOvers, getPowerplayOvers } from '../utils/cricketLogic';
 
 interface Props {
   currentAccount: TeamAccount;
   onNext: (home: SavedTeam, away: SavedTeam, overs: number) => void;
   onViewStats: () => void;
   onManageTeams: () => void;
+  onOpenDevDb?: () => void;
   onContinue?: () => void;
   onLogout: () => void;
   hasDraft?: boolean;
@@ -19,6 +22,7 @@ export const MatchSetup: React.FC<Props> = ({
   onNext,
   onViewStats,
   onManageTeams,
+  onOpenDevDb,
   onContinue,
   onLogout,
   hasDraft = false,
@@ -27,6 +31,8 @@ export const MatchSetup: React.FC<Props> = ({
   const [homeTeamId, setHomeTeamId] = useState('');
   const [awayTeamId, setAwayTeamId] = useState('');
   const [overs, setOvers] = useState(20);
+  const [customOversInput, setCustomOversInput] = useState<string>('');
+  const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
 
   useEffect(() => {
     const saved = getSavedTeams(currentAccount.id);
@@ -61,7 +67,12 @@ export const MatchSetup: React.FC<Props> = ({
         
         {/* Top Logged-in Team Account Bar */}
         <div className="flex items-center justify-between bg-gray-900/90 border border-gray-800 p-2.5 rounded-xl mb-4 shadow-sm">
-          <div className="flex items-center gap-2.5 overflow-hidden">
+          <button
+            type="button"
+            onClick={() => setIsAccountModalOpen(true)}
+            className="flex items-center gap-2.5 overflow-hidden text-left hover:opacity-80 transition-opacity"
+            title="Click to manage account and password"
+          >
             <div className="w-8 h-8 rounded-lg bg-tiger-gold/15 border border-tiger-gold/30 flex items-center justify-center text-base flex-shrink-0">
               {currentAccount.logoUrl || '🏏'}
             </div>
@@ -72,20 +83,38 @@ export const MatchSetup: React.FC<Props> = ({
               </div>
               <p className="text-[10px] text-gray-400 truncate">@{currentAccount.username} {currentAccount.city ? `• ${currentAccount.city}` : ''}</p>
             </div>
-          </div>
-
-          <button
-            onClick={() => {
-              if (confirm(`Log out from ${currentAccount.teamName}?`)) {
-                onLogout();
-              }
-            }}
-            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-gray-800 hover:bg-red-900/40 text-gray-300 hover:text-red-300 text-[11px] font-bold transition-all border border-gray-700 flex-shrink-0"
-            title="Log out or switch team"
-          >
-            <LogOut size={13} />
-            <span>Switch</span>
           </button>
+
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+            <button
+              onClick={() => setIsAccountModalOpen(true)}
+              className="p-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-tiger-gold border border-gray-700 transition-colors"
+              title="Account & Password Settings"
+            >
+              <KeyRound size={14} />
+            </button>
+            {onOpenDevDb && (
+              <button
+                onClick={onOpenDevDb}
+                className="p-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-tiger-gold border border-gray-700 transition-colors"
+                title="Developer Database Settings (Google Sheets)"
+              >
+                <Database size={14} />
+              </button>
+            )}
+            <button
+              onClick={() => {
+                if (confirm(`Log out from ${currentAccount.teamName}?`)) {
+                  onLogout();
+                }
+              }}
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-gray-800 hover:bg-red-900/40 text-gray-300 hover:text-red-300 text-[11px] font-bold transition-all border border-gray-700"
+              title="Log out or switch team"
+            >
+              <LogOut size={13} />
+              <span>Switch</span>
+            </button>
+          </div>
         </div>
 
         {/* Branding Header */}
@@ -99,22 +128,31 @@ export const MatchSetup: React.FC<Props> = ({
           <p className="text-gray-500 text-[10px] tracking-widest uppercase">Professional Match Setup</p>
         </div>
 
-        {/* Action Buttons: Stats & Teams */}
-        <div className="grid grid-cols-2 gap-2 mb-4">
+        {/* Action Buttons: Stats, Teams & Cloud DB */}
+        <div className="grid grid-cols-3 gap-2 mb-4">
           <button 
             onClick={onViewStats}
             className="bg-gray-800 border border-gray-700 hover:bg-gray-700 text-white py-2 rounded-xl flex flex-col items-center justify-center gap-1 transition-all shadow-md group"
           >
-            <BarChart2 size={20} className="text-tiger-gold group-hover:scale-110 transition-transform" /> 
-            <span className="text-[10px] font-bold uppercase">{currentAccount.teamName} Stats</span>
+            <BarChart2 size={18} className="text-tiger-gold group-hover:scale-110 transition-transform" /> 
+            <span className="text-[10px] font-bold uppercase truncate max-w-full px-1">Club Stats</span>
           </button>
           <button 
             onClick={onManageTeams}
             className="bg-gray-800 border border-gray-700 hover:bg-gray-700 text-white py-2 rounded-xl flex flex-col items-center justify-center gap-1 transition-all shadow-md group"
           >
-            <Users size={20} className="text-blue-400 group-hover:scale-110 transition-transform" /> 
-            <span className="text-[10px] font-bold uppercase">Manage Squads</span>
+            <Users size={18} className="text-blue-400 group-hover:scale-110 transition-transform" /> 
+            <span className="text-[10px] font-bold uppercase truncate max-w-full px-1">Squads</span>
           </button>
+          {onOpenDevDb && (
+            <button 
+              onClick={onOpenDevDb}
+              className="bg-gray-800 border border-gray-700 hover:bg-gray-700 text-white py-2 rounded-xl flex flex-col items-center justify-center gap-1 transition-all shadow-md group"
+            >
+              <Database size={18} className="text-emerald-400 group-hover:scale-110 transition-transform" /> 
+              <span className="text-[10px] font-bold uppercase truncate max-w-full px-1">Cloud & Sheets</span>
+            </button>
+          )}
         </div>
 
         <div className="space-y-4 bg-gray-900/50 p-5 rounded-2xl border border-gray-800 shadow-lg">
@@ -186,27 +224,87 @@ export const MatchSetup: React.FC<Props> = ({
           )}
 
           <div>
-            <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1.5">Match Overs</label>
-            <div className="flex gap-1.5">
-              {[5, 10, 20, 50].map(val => (
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-[10px] font-bold text-gray-500 uppercase">Match Overs</label>
+              <span className="text-[10px] font-mono text-tiger-gold font-bold">Selected: {overs} Overs</span>
+            </div>
+            
+            <div className="grid grid-cols-4 gap-1.5 mb-2">
+              {[2, 5, 8, 10, 12, 15, 20, 50].map(val => (
                 <button 
                   key={val}
-                  onClick={() => setOvers(val)}
-                  className={`flex-1 py-2 rounded-lg text-xs font-bold border transition-all ${
-                    overs === val 
-                      ? 'bg-tiger-gold text-black border-tiger-gold' 
+                  type="button"
+                  onClick={() => {
+                    setOvers(val);
+                    setCustomOversInput('');
+                  }}
+                  className={`py-2 rounded-lg text-xs font-bold border transition-all ${
+                    overs === val && !customOversInput
+                      ? 'bg-tiger-gold text-black border-tiger-gold shadow-md' 
                       : 'bg-gray-800 border-gray-700 text-gray-400 hover:text-white'
                   }`}
                 >
-                  {val}
+                  {val} Ov
                 </button>
               ))}
+            </div>
+
+            {/* Custom Overs Field without stuck 0 */}
+            <div className="flex items-center gap-2 bg-gray-800/80 border border-gray-700 rounded-lg px-3 py-1.5 focus-within:border-tiger-gold transition-all">
+              <span className="text-[11px] font-bold text-gray-400 whitespace-nowrap">Custom Overs:</span>
               <input 
-                type="number"
-                value={overs}
-                onChange={(e) => setOvers(Number(e.target.value))}
-                className="w-12 bg-gray-800 border border-gray-700 text-white text-center rounded-lg outline-none focus:border-tiger-gold font-bold text-xs"
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                placeholder="Type custom (e.g. 6, 16, 25)"
+                value={customOversInput}
+                onChange={(e) => {
+                  const cleaned = e.target.value.replace(/[^0-9]/g, '');
+                  setCustomOversInput(cleaned);
+                  const parsed = parseInt(cleaned, 10);
+                  if (!isNaN(parsed) && parsed > 0 && parsed <= 100) {
+                    setOvers(parsed);
+                  }
+                }}
+                onBlur={() => {
+                  if (!customOversInput || parseInt(customOversInput, 10) <= 0) {
+                    setCustomOversInput('');
+                  }
+                }}
+                className="flex-1 bg-transparent text-white text-xs outline-none font-bold placeholder:text-gray-600"
               />
+              {customOversInput && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCustomOversInput('');
+                    setOvers(20);
+                  }}
+                  className="text-[10px] text-gray-400 hover:text-white px-1 font-bold"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+            
+            {/* Format Rules Preview */}
+            <div className="mt-2.5 p-2 bg-black/40 border border-gray-800 rounded-lg flex flex-col gap-1 text-[10px]">
+              <div className="flex items-center justify-between text-gray-300">
+                <span className="flex items-center gap-1 font-bold text-amber-400">
+                  <Zap size={11} className="fill-amber-400" /> Powerplay
+                </span>
+                <span className="font-mono font-bold text-white">
+                  Overs 1 – {getPowerplayOvers(overs)} (Max 2 fielders outside)
+                </span>
+              </div>
+              <div className="flex items-center justify-between text-gray-300">
+                <span className="flex items-center gap-1 font-bold text-blue-400">
+                  <Target size={11} /> Bowler Limit
+                </span>
+                <span className="font-mono font-bold text-white">
+                  {getMaxBowlerOvers(overs)} overs / bowler
+                </span>
+              </div>
             </div>
           </div>
 
@@ -219,6 +317,14 @@ export const MatchSetup: React.FC<Props> = ({
             <span>Proceed to Squad Selection</span>
           </button>
         </div>
+
+        {/* Account & Password Management Modal */}
+        <AccountModal 
+          isOpen={isAccountModalOpen}
+          onClose={() => setIsAccountModalOpen(false)}
+          currentAccount={currentAccount}
+          onLogout={onLogout}
+        />
 
       </div>
     </div>

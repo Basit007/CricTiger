@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Database } from 'lucide-react';
 import { MatchSetup } from './components/MatchSetup';
 import { SquadSelection } from './components/SquadSelection';
 import { TossScreen } from './components/TossScreen';
@@ -10,6 +11,7 @@ import { TeamManager } from './components/TeamManager';
 import { AuthScreen } from './components/AuthScreen';
 import { MatchState, Team, SavedTeam, TeamAccount } from './types';
 import { MatchSummary } from './components/MatchSummary';
+import { DeveloperDbModal } from './components/DeveloperDbModal';
 import { 
   getSavedMatches, 
   saveMatch, 
@@ -18,8 +20,10 @@ import {
   getDraftMatch, 
   saveDraftMatch, 
   clearDraftMatch,
-  purgeOldLegacyData 
+  purgeOldLegacyData,
+  getDeveloperDbConfig 
 } from './utils/storage';
+import { syncAllToGoogleSheets } from './services/googleSheetsService';
 
 interface SetupData {
   homeTeam: SavedTeam;
@@ -40,6 +44,7 @@ const App: React.FC = () => {
   const [history, setHistory] = useState<MatchState[]>([]);
   const [hasDraft, setHasDraft] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isDevDbModalOpen, setIsDevDbModalOpen] = useState(false);
 
   // Initialize and load active account
   useEffect(() => {
@@ -245,6 +250,15 @@ const App: React.FC = () => {
     if (currentAccount) {
       saveMatch(finalState, currentAccount.id);
       clearDraftMatch(currentAccount.id);
+
+      // Auto-sync with Google Sheets database if developer enabled auto-sync
+      const dbConfig = getDeveloperDbConfig();
+      if (dbConfig.sheetWebhookUrl && dbConfig.autoSyncOnMatchEnd) {
+        const updatedHistory = [...matchHistory, finalState];
+        syncAllToGoogleSheets(updatedHistory, currentAccount.teamName).catch(err => {
+          console.warn('Background auto-sync to Google Sheet failed:', err);
+        });
+      }
     }
     setMatchHistory(prev => [...prev, finalState]);
     setHasDraft(false);
@@ -262,17 +276,44 @@ const App: React.FC = () => {
 
   // Not logged in -> Show Authentication Screen
   if (!currentAccount) {
-    return <AuthScreen onLoginSuccess={handleLoginSuccess} />;
+    return (
+      <div className="h-[100dvh] w-full bg-tiger-black text-white flex flex-col font-sans overflow-hidden relative">
+        <AuthScreen 
+          onLoginSuccess={handleLoginSuccess}
+          onOpenDevDb={() => setIsDevDbModalOpen(true)}
+        />
+
+        {/* Developer Database Control Modal (Admin Protected) */}
+        <DeveloperDbModal 
+          isOpen={isDevDbModalOpen}
+          onClose={() => setIsDevDbModalOpen(false)}
+          matchHistory={matchHistory}
+          currentTeamName="All Clubs"
+        />
+
+        {/* Floating Developer & Cloud Access Button */}
+        <button
+          type="button"
+          onClick={() => setIsDevDbModalOpen(true)}
+          className="fixed bottom-3 right-3 z-40 bg-gray-900/95 hover:bg-gray-800 text-tiger-gold border border-tiger-gold/50 hover:border-tiger-gold px-3 py-2 rounded-xl shadow-2xl flex items-center gap-2 text-xs font-black uppercase tracking-wider transition-all active:scale-95 backdrop-blur cursor-pointer"
+          title="Developer Database & Google Sheets Console (PIN: 1234)"
+        >
+          <Database size={15} className="text-tiger-gold animate-pulse flex-shrink-0" />
+          <span>Cloud DB & Sheets</span>
+        </button>
+      </div>
+    );
   }
 
   return (
-    <div className="h-[100dvh] w-full bg-tiger-black text-white flex flex-col font-sans overflow-hidden">
+    <div className="h-[100dvh] w-full bg-tiger-black text-white flex flex-col font-sans overflow-hidden relative">
       {view === 'setup' && (
         <MatchSetup 
           currentAccount={currentAccount}
           onNext={handleSetupComplete} 
           onViewStats={() => setView('stats')}
           onManageTeams={() => setView('team-manager')}
+          onOpenDevDb={() => setIsDevDbModalOpen(true)}
           onContinue={hasDraft ? handleContinueDraft : undefined}
           onLogout={handleLogout}
           hasDraft={hasDraft}
@@ -312,6 +353,7 @@ const App: React.FC = () => {
           battingPlayers={matchState.battingTeam.players}
           bowlingPlayers={matchState.bowlingTeam.players}
           onStart={handleStartInnings}
+          totalOvers={matchState.totalOvers}
         />
       )}
 
@@ -344,8 +386,28 @@ const App: React.FC = () => {
           matchHistory={matchHistory} 
           currentTeamName={currentAccount.teamName}
           onBack={() => setView('setup')} 
+          onOpenDevDb={() => setIsDevDbModalOpen(true)}
         />
       )}
+
+      {/* Developer Database Control Modal (Admin Protected) */}
+      <DeveloperDbModal 
+        isOpen={isDevDbModalOpen}
+        onClose={() => setIsDevDbModalOpen(false)}
+        matchHistory={matchHistory}
+        currentTeamName={currentAccount?.teamName || 'Club'}
+      />
+
+      {/* Floating Developer & Cloud Access Button visible on every screen */}
+      <button
+        type="button"
+        onClick={() => setIsDevDbModalOpen(true)}
+        className="fixed bottom-3 right-3 z-40 bg-gray-900/95 hover:bg-gray-800 text-tiger-gold border border-tiger-gold/50 hover:border-tiger-gold px-3 py-2 rounded-xl shadow-2xl flex items-center gap-2 text-xs font-black uppercase tracking-wider transition-all active:scale-95 backdrop-blur cursor-pointer"
+        title="Developer Database & Google Sheets Console (PIN: 1234)"
+      >
+        <Database size={15} className="text-tiger-gold animate-pulse flex-shrink-0" />
+        <span>Cloud DB & Sheets</span>
+      </button>
     </div>
   );
 };

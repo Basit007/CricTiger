@@ -1,112 +1,78 @@
-import { GoogleGenAI, Modality } from "@google/genai";
 import { MatchState, BallEvent } from '../types';
 
-// NOTE: Use GEMINI_API_KEY as per React guidelines in skill
-const API_KEY = process.env.GEMINI_API_KEY || '';
-
-let ai: GoogleGenAI | null = null;
-if (API_KEY) {
-  ai = new GoogleGenAI({ apiKey: API_KEY });
-}
+const fetchWithTimeout = async (url: string, options: RequestInit, timeoutMs = 3500): Promise<Response> => {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, { ...options, signal: controller.signal });
+    clearTimeout(id);
+    return res;
+  } catch (err) {
+    clearTimeout(id);
+    throw err;
+  }
+};
 
 export const generateCommentary = async (lastBall: BallEvent, state: MatchState): Promise<string> => {
-  if (!ai) return "Gemini API Key missing.";
-
-  const prompt = `
-    You are the legendary cricket commentator Ian Bishop.
-    
-    Match Context:
-    - Score: ${state.totalRuns}/${state.wickets}
-    - Overs: ${state.currentOver}.${state.currentBall}
-    - Event: ${lastBall.description} (Runs: ${lastBall.runs}, Wicket: ${lastBall.isWicket})
-    
-    Write a single, electrifying line of commentary (max 20 words) for this ball.
-    
-    Style Guidelines:
-    - Use Ian Bishop's iconic voice: passionate, deep, and poetic.
-    - If it's a SIX or WICKET: Go absolutely wild. Use phrases like "REMEMBER THE NAME!", "INTO THE ORBIT!", "MAGNIFICENT!", "ABSOLUTE CARNAGE!", "THAT IS HUGE!".
-    - If it's a dot ball: Be analytical but intense. Praise the bowler's line and length using words like "Corridor of uncertainty", "Absolute beauty", "Peach of a delivery".
-    - Do not sound generic. Sound like you are in the commentary box at a T20 World Cup final.
-  `;
-
   try {
-    const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: prompt,
-    });
-    return response.text.trim();
+    const res = await fetchWithTimeout('/api/gemini/commentary', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lastBall, state })
+    }, 3000);
+    if (!res.ok) throw new Error(`Server returned ${res.status}`);
+    const data = await res.json();
+    return data.commentary || "Oh, what a delivery! Absolute beauty!";
   } catch (error) {
-    console.error("Gemini Error:", error);
-    return "Oh, what a delivery! Absolute beauty!";
+    if (lastBall.isWicket) return "WICKET! Massive breakthrough in this match!";
+    if (lastBall.runs === 6) return "SIX! That has disappeared high into the stands!";
+    if (lastBall.runs === 4) return "FOUR! Pure timing, crunched away to the boundary fence!";
+    if (lastBall.runs === 0) return "Dot ball. Excellent line and length on that delivery.";
+    return `${lastBall.runs} run${lastBall.runs > 1 ? 's' : ''} pushed into the gap nicely.`;
   }
 };
 
 export const generateSpeech = async (text: string): Promise<string | null> => {
-  if (!ai) return null;
-
   try {
-    const response = await ai.models.generateContent({
-      model: "gemini-3.1-flash-tts-preview",
-      contents: [{ parts: [{ text: `Say this in a HIGHLY ENERGETIC, passionate, and professional sports commentator style (Ian Bishop style): ${text}` }] }],
-      config: {
-        responseModalities: [Modality.AUDIO],
-        speechConfig: {
-          voiceConfig: {
-            // 'Puck', 'Charon', 'Kore', 'Fenrir', 'Zephyr'
-            // 'Fenrir' or 'Zephyr' are likely more intense. Let's try 'Charon' or 'Zephyr'.
-            prebuiltVoiceConfig: { voiceName: 'Charon' },
-          },
-        },
-      },
-    });
-
-    const base64Audio = response.candidates?.[0]?.content?.parts?.find(p => p.inlineData)?.inlineData?.data;
-    return base64Audio || null;
+    const res = await fetchWithTimeout('/api/gemini/speech', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text })
+    }, 3500);
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data.audio || null;
   } catch (error) {
-    console.error("Gemini TTS Error:", error);
     return null;
   }
 };
 
 export const askRuleQuestion = async (query: string): Promise<string> => {
-  if (!ai) return "AI service unavailable.";
-
   try {
-    const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: `Answer this cricket rule question briefly based on ICC Playing Conditions: ${query}`,
-    });
-    return response.text.trim();
+    const res = await fetchWithTimeout('/api/gemini/rule', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query })
+    }, 4000);
+    if (!res.ok) throw new Error(`Server returned ${res.status}`);
+    const data = await res.json();
+    return data.answer || "ICC match regulations govern this scenario.";
   } catch (error) {
-    return "Unable to fetch rule.";
+    return "Refer to MCC Laws of Cricket and standard ICC match regulations.";
   }
 };
 
 export const generateMatchSummary = async (state: MatchState): Promise<string> => {
-  if (!ai) return "AI service unavailable.";
-  
-  const summaryData = {
-    score: `${state.totalRuns}/${state.wickets}`,
-    overs: `${state.currentOver}.${state.currentBall}`,
-    topBatters: state.battingTeam.players.sort((a,b) => b.runs - a.runs).slice(0, 2).map(p => `${p.name} (${p.runs})`),
-    keyEvents: state.ballHistory.filter(b => b.isWicket || b.runs >= 4).length
-  };
-
-  const prompt = `
-    You are Ian Bishop summarizing a cricket match.
-    Data: ${JSON.stringify(summaryData)}
-    
-    Write a 2-sentence post-match summary. 
-    Use your signature dramatic flair. If the score is high, call it a "batting masterclass" or "power-hitting display". If wickets fell, call it "absolute destruction" or "bowling wizardry".
-  `;
-
   try {
-    const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: prompt,
-    });
-    return response.text;
+    const res = await fetchWithTimeout('/api/gemini/summary', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ state })
+    }, 4500);
+    if (!res.ok) throw new Error(`Server returned ${res.status}`);
+    const data = await res.json();
+    return data.summary || "A fiercely contested match concluded with outstanding commitment from both teams.";
   } catch (error) {
-    return "Match concluded.";
+    return "A fantastic display of cricket concluded today. Both sides fought hard in this high-stakes encounter.";
   }
 };

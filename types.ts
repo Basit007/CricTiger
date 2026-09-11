@@ -64,6 +64,8 @@ export enum WicketType {
   RUN_OUT = 'Run Out',
   STUMPED = 'Stumped',
   HIT_WICKET = 'Hit Wicket',
+  RETIRED_HURT = 'Retired Hurt',
+  RETIRED_OUT = 'Retired Out',
 }
 
 export interface BallEvent {
@@ -78,6 +80,7 @@ export interface BallEvent {
   timestamp: number;
   isLegalBall: boolean;
   inningsNumber: 1 | 2;
+  isDeclaration?: boolean;
 }
 
 export interface WicketDetails {
@@ -100,6 +103,7 @@ export interface MatchState {
   strikerId: string;
   nonStrikerId: string;
   currentBowlerId: string;
+  lastOverBowlerId?: string; // Bowler who completed previous over (cannot bowl consecutive overs)
   ballHistory: BallEvent[];
   matchStatus: 'LIVE' | 'INNINGS_BREAK' | 'COMPLETED';
   isFreeHit?: boolean;
@@ -113,4 +117,8 @@ export interface MatchState {
     overs: string;
     teamName: string;
   };
+  // Declaration & Weather/Rain fields
+  declarationNote?: string;
+  customResult?: string;
+  isDeclaredInnings?: boolean;
 }

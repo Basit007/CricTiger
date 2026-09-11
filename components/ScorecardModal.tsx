@@ -1,7 +1,7 @@
 import React from 'react';
 import { Player, Team, MatchState } from '../types';
-import { calculateStrikeRate, calculateEconomy } from '../utils/cricketLogic';
-import { X, Trophy, Target } from 'lucide-react';
+import { calculateStrikeRate, calculateEconomy, getMaxBowlerOvers, getPowerplayOvers, getInningsPowerplayScore } from '../utils/cricketLogic';
+import { X, Trophy, Target, Zap } from 'lucide-react';
 
 interface Props {
   matchState: MatchState;
@@ -160,28 +160,38 @@ export const ScorecardModal: React.FC<Props> = ({ matchState, onClose, inningsTo
               </tr>
             </thead>
             <tbody>
-              {bowlingPlayers.map((p) => (
-                <tr key={p.id} className="border-b border-gray-800/50 hover:bg-white/5 transition-colors">
-                  <td className="p-3">
-                    <span className="text-sm font-bold truncate block">{p.name}</span>
-                  </td>
-                  <td className="p-3 text-right text-xs font-bold tabular-nums">
-                    {Math.floor(p.ballsBowled / 6)}.{p.ballsBowled % 6}
-                  </td>
-                  <td className="p-3 text-right text-xs text-gray-400 tabular-nums">{p.maidens}</td>
-                  <td className="p-3 text-right text-sm font-black text-red-400 tabular-nums">{p.runsConceded}</td>
-                  <td className="p-3 text-right text-sm font-black text-blue-400 tabular-nums">{p.wickets}</td>
-                  <td className="p-3 text-right text-xs text-gray-400 tabular-nums font-mono">{calculateEconomy(p.runsConceded, p.ballsBowled)}</td>
-                </tr>
-              ))}
+              {bowlingPlayers.map((p) => {
+                const maxOvers = getMaxBowlerOvers(matchState.totalOvers);
+                const isQuotaFull = p.ballsBowled >= maxOvers * 6;
+                return (
+                  <tr key={p.id} className="border-b border-gray-800/50 hover:bg-white/5 transition-colors">
+                    <td className="p-3">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-sm font-bold truncate block">{p.name}</span>
+                        {isQuotaFull && (
+                          <span className="text-[8px] px-1 py-0.2 rounded bg-red-500/20 text-red-400 font-bold uppercase">Max</span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="p-3 text-right text-xs font-bold tabular-nums">
+                      {Math.floor(p.ballsBowled / 6)}.{p.ballsBowled % 6}
+                      <span className="text-[9px] text-gray-500 font-normal ml-0.5">/{maxOvers}</span>
+                    </td>
+                    <td className="p-3 text-right text-xs text-gray-400 tabular-nums">{p.maidens}</td>
+                    <td className="p-3 text-right text-sm font-black text-red-400 tabular-nums">{p.runsConceded}</td>
+                    <td className="p-3 text-right text-sm font-black text-blue-400 tabular-nums">{p.wickets}</td>
+                    <td className="p-3 text-right text-xs text-gray-400 tabular-nums font-mono">{calculateEconomy(p.runsConceded, p.ballsBowled)}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
 
-        {/* Fall of Wickets - Simplified */}
+        {/* Fall of Wickets & Powerplay Stats */}
         <div className="p-4 bg-gray-900/50 mt-4 mx-4 rounded-xl border border-gray-800">
            <h4 className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">Team Statistics</h4>
-           <div className="grid grid-cols-2 gap-4">
+           <div className="grid grid-cols-3 gap-3">
               <div className="bg-black/20 p-2 rounded border border-white/5">
                  <div className="text-[8px] text-gray-500 font-bold uppercase">Run Rate</div>
                  <div className="text-sm font-black text-white">
@@ -191,8 +201,28 @@ export const ScorecardModal: React.FC<Props> = ({ matchState, onClose, inningsTo
                         : (matchState.currentOver + matchState.currentBall/6)) || 1)).toFixed(2)}
                  </div>
               </div>
+              
+              {/* Powerplay Stat Card */}
+              {(() => {
+                const ppOvers = getPowerplayOvers(matchState.totalOvers);
+                const ppScore = getInningsPowerplayScore(matchState.ballHistory, currentInnings as 1 | 2, ppOvers);
+                return (
+                  <div className="bg-black/20 p-2 rounded border border-white/5">
+                     <div className="text-[8px] text-amber-400 font-bold uppercase flex items-center gap-0.5">
+                       <Zap size={9} className="fill-amber-400" /> PP (1–{ppOvers} ov)
+                     </div>
+                     <div className="text-sm font-black text-white tabular-nums">
+                       {ppScore.runs}/{ppScore.wickets}
+                       <span className="text-[9px] text-gray-400 font-normal ml-1">
+                         ({Math.floor(ppScore.balls / 6)}.{ppScore.balls % 6} ov)
+                       </span>
+                     </div>
+                  </div>
+                );
+              })()}
+
               <div className="bg-black/20 p-2 rounded border border-white/5">
-                 <div className="text-[8px] text-gray-500 font-bold uppercase">Fours/Sixes</div>
+                 <div className="text-[8px] text-gray-500 font-bold uppercase">Fours / Sixes</div>
                  <div className="text-sm font-black text-white">
                    {battingPlayers.reduce((acc, p) => acc + p.fours, 0)} / {battingPlayers.reduce((acc, p) => acc + p.sixes, 0)}
                  </div>
