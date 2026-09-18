@@ -1,0 +1,29 @@
+[
+  {
+    "id": "acc_1788852896156_hwedt",
+    "teamName": "Taxila Tigers",
+    "username": "tigers_xi",
+    "passwordHash": "ct_170842_4",
+    "city": "Taxila",
+    "managerName": "Coach Imran",
+    "logoUrl": "🐯",
+    "createdAt": 1788852896156
+  },
+  {
+    "id": "acc_1788852896157_ua5ns",
+    "teamName": "Rawalpindi Royals",
+    "username": "royals_xi",
+    "passwordHash": "ct_4889ba9b_8",
+    "city": "Rawalpindi",
+    "managerName": "Captain Babar",
+    "logoUrl": "🦁",
+    "createdAt": 1788852896157
+  },
+  {
+    "id": "acc_1789247716160_l2z3o",
+    "teamName": "Test Cross Device XI",
+    "username": "crossdevice_user",
+    "passwordHash": "ct_53ab39b7_11",
+    "createdAt": 1789247716160
+  }
+]

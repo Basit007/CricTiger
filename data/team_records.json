@@ -1,0 +1,28 @@
+{
+  "acc_1789247716160_l2z3o": {
+    "matches": [],
+    "teams": [
+      {
+        "id": "team_acc_1789247716160_l2z3o_primary",
+        "name": "Test Cross Device XI",
+        "squad": [
+          "Test Cross Device XI Player 1",
+          "Test Cross Device XI Player 2",
+          "Test Cross Device XI Player 3",
+          "Test Cross Device XI Player 4",
+          "Test Cross Device XI Player 5",
+          "Test Cross Device XI Player 6",
+          "Test Cross Device XI Player 7",
+          "Test Cross Device XI Player 8",
+          "Test Cross Device XI Player 9",
+          "Test Cross Device XI Player 10",
+          "Test Cross Device XI Player 11",
+          "Test Cross Device XI Player 12",
+          "Test Cross Device XI Player 13",
+          "Test Cross Device XI Player 14",
+          "Test Cross Device XI Player 15"
+        ]
+      }
+    ]
+  }
+}
